@@ -1,3 +1,3 @@
-#Financial Tracker
+# Financial Tracker
 
-##A Simple Financial Tracking API with Spring MVC
+## A Simple Financial Tracking API with Spring MVC
