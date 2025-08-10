@@ -1,14 +1,14 @@
 # ===== Default profile (PostgreSQL) =====
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:3000/fintrack
-    username: postgres         # <-- change if needed
-    password: htetlinaung         # <-- change if needed
+    url: jdbc:postgresql://localhost:5432/fintrack   # <-- DB port must be 5432
+    username: postgres
+    password: htetlinaung
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
     hibernate:
-      ddl-auto: update         # For dev; prefer Flyway/Liquibase in prod
+      ddl-auto: update
     properties:
       hibernate.format_sql: true
       hibernate.jdbc.time_zone: UTC
