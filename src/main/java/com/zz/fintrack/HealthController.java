@@ -5,8 +5,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class HealthController {
-    @GetMapping("/")
-    public String home() {
+    @GetMapping("/api/health")
+    public String health() {
         return "Financial-API is running ✅";
     }
 }

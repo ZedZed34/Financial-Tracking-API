@@ -1,8 +1,222 @@
 <!doctype html>
-<html>
-<head><meta charset="utf-8"><title>Financial-API</title></head>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Financial-API</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 24px; }
+    h1 { margin: 0 0 8px; }
+    .card { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin: 12px 0; }
+    .row { display: flex; flex-wrap: wrap; gap: 16px; }
+    label { display: block; font-size: 12px; color: #555; margin-bottom: 4px; }
+    input, select { padding: 8px; border: 1px solid #ccc; border-radius: 6px; min-width: 220px; }
+    button { padding: 8px 12px; border: 0; background:#3b82f6; color:#fff; border-radius:6px; cursor:pointer; }
+    button.secondary { background:#64748b; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    .muted { color:#64748b; }
+    table { border-collapse: collapse; width:100%; font-size: 14px; }
+    th, td { border-bottom: 1px solid #eee; padding: 8px; text-align: left; }
+    code { background: #f6f8fa; padding: 2px 6px; border-radius: 4px; }
+    .hidden { display:none; }
+  </style>
+  <script>
+    const api = {
+      base: '', // same origin
+      token: null,
+      setToken(t){ this.token = t; localStorage.setItem('jwt', t); renderAuth(); },
+      getToken(){ return this.token || localStorage.getItem('jwt'); }
+    };
+
+    function b64decodeUnicode(str){
+      try { return decodeURIComponent(atob(str).split('').map(function(c){return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)}).join('')); }
+      catch { return '{}'; }
+    }
+    function parseJwtSubjectEmail(token){
+      try { const payload = JSON.parse(b64decodeUnicode(token.split('.')[1])); return payload.sub; } catch { return null; }
+    }
+
+    async function http(path, options = {}){
+      const headers = options.headers || {}; headers['Content-Type'] = 'application/json';
+      const t = api.getToken(); if (t) headers['Authorization'] = 'Bearer ' + t;
+      const res = await fetch(api.base + path, { ...options, headers });
+      if(!res.ok){
+        const text = await res.text(); throw new Error('HTTP ' + res.status + ' - ' + text);
+      }
+      const ct = res.headers.get('content-type') || '';
+      return ct.includes('application/json') ? res.json() : res.text();
+    }
+
+    async function signup(ev){
+      ev.preventDefault();
+      const email = document.getElementById('su_email').value.trim();
+      const name = document.getElementById('su_name').value.trim();
+      const password = document.getElementById('su_password').value;
+      const data = await http('/api/auth/signup', { method:'POST', body: JSON.stringify({ email, name, password }) });
+      api.setToken(data.token); info('Signed up. Token stored.'); await loadMe();
+    }
+    async function login(ev){
+      ev.preventDefault();
+      const email = document.getElementById('li_email').value.trim();
+      const password = document.getElementById('li_password').value;
+      const data = await http('/api/auth/login', { method:'POST', body: JSON.stringify({ email, password }) });
+      api.setToken(data.token); info('Logged in. Token stored.'); await loadMe();
+    }
+    function logout(){ api.setToken(''); localStorage.removeItem('jwt'); state.user = null; renderAuth(); }
+
+    const state = { user: null, accounts: [], transactions: [], weekly: [] };
+
+    async function loadMe(){
+      const token = api.getToken(); if(!token){ state.user=null; renderAuth(); return; }
+      const email = parseJwtSubjectEmail(token);
+      const users = await http('/api/users');
+      const me = users.find(u => u.email === email);
+      state.user = me || null; renderAuth();
+      if(me){ await loadAccounts(); }
+    }
+
+    async function loadAccounts(){
+      if(!state.user) return;
+      state.accounts = await http('/api/accounts?userId=' + state.user.id);
+      const sel = document.getElementById('accountSelect');
+      sel.innerHTML = state.accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('');
+    }
+
+    function lastSixMonths(){
+      const end = new Date();
+      const start = new Date(); start.setMonth(start.getMonth() - 6); start.setDate(start.getDate() + 1);
+      const toIso = d => d.toISOString().slice(0,10);
+      return { start: toIso(start), end: toIso(end) };
+    }
+
+    async function fetchLastSixMonths(){
+      if(!state.user){ return info('Login first'); }
+      const accId = document.getElementById('accountSelect').value;
+      const { start, end } = lastSixMonths();
+      const page = await http(`/api/transactions?userId=${state.user.id}&start=${start}&end=${end}&size=200`);
+      state.transactions = page.content || [];
+      renderTx();
+      state.weekly = await http(`/api/transactions/reports/weekly-totals?userId=${state.user.id}&weeks=26`);
+      renderWeekly();
+    }
+
+    async function seedWeekly(){
+      if(!state.user){ return info('Login first'); }
+      const accId = document.getElementById('accountSelect').value;
+      const catId = document.getElementById('categoryId').value || '';
+      const payloadUrl = `/api/transactions/seed/weekly?userId=${state.user.id}&accountId=${accId}&weeks=26&currency=USD` + (catId?`&categoryId=${catId}`:'');
+      const res = await http(payloadUrl, { method:'POST' });
+      info('Seeded weekly expenses: ' + res.length);
+      await fetchLastSixMonths();
+    }
+
+    function info(msg){ const el = document.getElementById('info'); el.textContent = msg; setTimeout(()=> el.textContent='', 4000); }
+
+    function renderAuth(){
+      const token = api.getToken();
+      const isAuthed = token && token.length > 20;
+      document.getElementById('authSection').classList.toggle('hidden', isAuthed);
+      document.getElementById('appSection').classList.toggle('hidden', !isAuthed);
+      document.getElementById('jwtPreview').textContent = isAuthed ? token.slice(0,32) + '...' : '(none)';
+    }
+
+    function renderTx(){
+      const tbody = document.querySelector('#txTable tbody');
+      tbody.innerHTML = (state.transactions || []).map(t => `
+        <tr>
+          <td>${t.date}</td>
+          <td>${t.type}</td>
+          <td>${t.amount}</td>
+          <td>${t.currency}</td>
+          <td>${t.note || ''}</td>
+        </tr>
+      `).join('');
+    }
+    function renderWeekly(){
+      const tbody = document.querySelector('#weeklyTable tbody');
+      tbody.innerHTML = (state.weekly || []).map(w => `
+        <tr><td>${w.week}</td><td>${w.totalExpense}</td></tr>
+      `).join('');
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => { renderAuth(); await loadMe(); });
+  </script>
+</head>
 <body>
-<h1>Financial-API is running ✅</h1>
-<p>Try <code>/api/users</code> or <code>/api/transactions</code> endpoints.</p>
+  <h1>Financial-API</h1>
+  <p class="muted">Signup or login to see your details.</p>
+
+  <div id="info" class="muted"></div>
+
+  <div id="authSection" class="card">
+    <div class="row">
+      <form onsubmit="signup(event)">
+        <h3>Sign up</h3>
+        <label>Email</label>
+        <input id="su_email" type="email" required />
+        <label>Name</label>
+        <input id="su_name" type="text" required />
+        <label>Password</label>
+        <input id="su_password" type="password" required />
+        <div style="margin-top:8px"><button type="submit">Create account</button></div>
+      </form>
+
+      <form onsubmit="login(event)">
+        <h3>Login</h3>
+        <label>Email</label>
+        <input id="li_email" type="email" required />
+        <label>Password</label>
+        <input id="li_password" type="password" required />
+        <div style="margin-top:8px"><button type="submit">Login</button></div>
+      </form>
+    </div>
+    <p class="muted">API docs: <a href="/swagger-ui/index.html">Swagger UI</a></p>
+  </div>
+
+  <div id="appSection" class="hidden">
+    <div class="card">
+      <div class="row" style="align-items:flex-end">
+        <div>
+          <div class="muted">Bearer token:</div>
+          <code id="jwtPreview"></code>
+        </div>
+        <div><button class="secondary" onclick="logout()">Logout</button></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Your data</h3>
+      <div class="row">
+        <div>
+          <label>Account</label>
+          <select id="accountSelect"></select>
+        </div>
+        <div>
+          <label>Category ID (optional)</label>
+          <input id="categoryId" placeholder="e.g. 1" />
+        </div>
+      </div>
+      <div style="margin-top:8px" class="row">
+        <button onclick="fetchLastSixMonths()">Load last 6 months transactions</button>
+        <button class="secondary" onclick="seedWeekly()">Seed weekly expenses (6 months)</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Transactions (last 6 months)</h3>
+      <table id="txTable">
+        <thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Currency</th><th>Note</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Weekly totals (last 6 months)</h3>
+      <table id="weeklyTable">
+        <thead><tr><th>Week</th><th>Total Expense</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
 </body>
 </html>

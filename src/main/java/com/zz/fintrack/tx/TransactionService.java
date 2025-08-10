@@ -14,7 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.temporal.WeekFields;
 import java.util.List;
+import java.util.Locale;
+import java.util.stream.Collectors;
 
 @Service
 public class TransactionService {
@@ -77,5 +80,58 @@ public class TransactionService {
                 t.getType().name(), t.getAmount(), t.getDate(), t.getNote(),
                 t.getCurrency(), t.getBaseAmount(), t.getBaseCurrency()
         );
+    }
+
+    @Transactional
+    public List<View> seedWeeklyExpenses(Long userId, Long accountId, Long categoryId, int weeks,
+                                         String currency, BigDecimal amountPerWeek) {
+        Account acct = acctRepo.findById(accountId)
+                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
+        Category cat = categoryId == null ? null :
+                catRepo.findById(categoryId).orElseThrow(() -> new EntityNotFoundException("Category not found"));
+
+        LocalDate today = LocalDate.now();
+        LocalDate start = today.minusWeeks(weeks - 1);
+        var toSave = start.datesUntil(today.plusDays(1))
+                .filter(d -> d.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) // one expense per week (Sunday)
+                .map(d -> Transaction.builder()
+                        .userId(userId)
+                        .account(acct)
+                        .category(cat)
+                        .type(TxType.EXPENSE)
+                        .amount(amountPerWeek)
+                        .date(d)
+                        .note("Weekly expense")
+                        .currency(currency)
+                        .baseAmount(amountPerWeek)
+                        .baseCurrency(currency)
+                        .build())
+                .toList();
+        return txRepo.saveAll(toSave).stream().map(this::toView).toList();
+    }
+
+    public List<com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal> weeklyTotals(Long userId, int weeks) {
+        LocalDate end = LocalDate.now();
+        LocalDate start = end.minusWeeks(weeks - 1);
+        var data = txRepo.findByUserIdAndDateBetween(userId, start, end, PageRequest.of(0, Integer.MAX_VALUE))
+                .stream()
+                .collect(Collectors.groupingBy(t -> {
+                    WeekFields wf = WeekFields.of(Locale.getDefault());
+                    int week = t.getDate().get(wf.weekOfWeekBasedYear());
+                    int year = t.getDate().get(wf.weekBasedYear());
+                    return year + "-W" + week;
+                }, Collectors.mapping(t -> t, Collectors.toList())));
+
+        return data.entrySet().stream()
+                .map(e -> new com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal(
+                        e.getKey(),
+                        e.getValue().stream()
+                                .filter(t -> t.getType() == TxType.EXPENSE)
+                                .map(Transaction::getBaseAmount)
+                                .filter(v -> v != null)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                ))
+                .sorted((a,b) -> a.week().compareTo(b.week()))
+                .toList();
     }
 }

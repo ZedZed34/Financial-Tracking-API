@@ -1,15 +1,16 @@
 # ===== Default profile (PostgreSQL) =====
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/fintrack   # <-- DB port must be 5432
-    username: postgres
-    password: htetlinaung
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/fintrack}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
     hibernate:
       ddl-auto: update
     properties:
+      hibernate.dialect: org.hibernate.dialect.PostgreSQLDialect
       hibernate.format_sql: true
       hibernate.jdbc.time_zone: UTC
   jackson:

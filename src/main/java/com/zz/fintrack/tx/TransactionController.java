@@ -46,4 +46,28 @@ public class TransactionController {
                                           @RequestParam int month) {
         return service.monthlyReport(userId, year, month);
     }
+
+    // Create weekly expenses in bulk for the last N weeks (default 26 ~ 6 months)
+    @PostMapping("/seed/weekly")
+    public ResponseEntity<List<View>> seedWeekly(
+            @RequestParam Long userId,
+            @RequestParam Long accountId,
+            @RequestParam(required = false) Long categoryId,
+            @RequestParam(defaultValue = "26") int weeks,
+            @RequestParam(defaultValue = "USD") String currency,
+            @RequestParam(defaultValue = "25.00") java.math.BigDecimal amountPerWeek
+    ) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(
+                service.seedWeeklyExpenses(userId, accountId, categoryId, weeks, currency, amountPerWeek)
+        );
+    }
+
+    // Weekly totals for the last 6 months
+    @GetMapping("/reports/weekly-totals")
+    public List<com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal> weeklyTotals(
+            @RequestParam Long userId,
+            @RequestParam(defaultValue = "26") int weeks
+    ) {
+        return service.weeklyTotals(userId, weeks);
+    }
 }

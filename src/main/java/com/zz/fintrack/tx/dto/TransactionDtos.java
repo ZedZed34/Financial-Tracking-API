@@ -28,4 +28,6 @@ public class TransactionDtos {
     public record MonthlyReportRow(
             Long categoryId, String categoryName, String type, BigDecimal totalBase
     ) {}
+
+    public record WeeklyTotal(String week, BigDecimal totalExpense) {}
 }
