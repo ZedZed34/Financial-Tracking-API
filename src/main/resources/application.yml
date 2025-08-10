@@ -1,21 +1,28 @@
+# ===== Default profile (PostgreSQL) =====
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/fintrack
-    username: postgres
-    password: postgres
+    username: postgres         # <-- change if needed
+    password: htetlinaung         # <-- change if needed
+    driver-class-name: org.postgresql.Driver
   jpa:
-    hibernate:
-      ddl-auto: update
     open-in-view: false
+    hibernate:
+      ddl-auto: update         # For dev; prefer Flyway/Liquibase in prod
     properties:
       hibernate.format_sql: true
+      hibernate.jdbc.time_zone: UTC
   jackson:
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
-server:
-  port: 8080
+    time-zone: UTC
 
-# Dev profile (H2). Run with: -Dspring.profiles.active=dev
+logging:
+  level:
+    org.springframework.web: info
+    org.hibernate.SQL: warn
+
+# ===== Dev profile (H2 in-memory) =====
 ---
 spring:
   config:
@@ -27,3 +34,11 @@ spring:
   jpa:
     hibernate:
       ddl-auto: create-drop
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  level:
+    org.hibernate.SQL: debug
