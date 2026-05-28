@@ -50,7 +50,7 @@ public class SecurityConfig {
         http.csrf(csrf -> csrf.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/index.html", "/favicon.ico", "/h2-console/**", "/swagger-ui/**", "/v3/api-docs/**", "/api/auth/**", "/api/health").permitAll()
+                .requestMatchers("/", "/index.html", "/favicon.ico", "/h2-console/**", "/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**", "/api/auth/**", "/api/health").permitAll()
                 .anyRequest().authenticated()
             )
             .headers(headers -> headers.frameOptions(frame -> frame.disable()))
