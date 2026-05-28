@@ -31,12 +31,23 @@ public class CategoryService {
         return repo.findById(id).orElseThrow(() -> new EntityNotFoundException("Category not found"));
     }
 
-    public Category update(Long id, Category in){
-        var c = get(id);
+    public Category getOwned(Long id, Long userId){
+        Category c = get(id);
+        if (!c.getUser().getId().equals(userId)) {
+            throw new org.springframework.security.access.AccessDeniedException("You do not own this category");
+        }
+        return c;
+    }
+
+    public Category update(Long id, Long userId, Category in){
+        var c = getOwned(id, userId);
         c.setName(in.getName());
         c.setType(in.getType());
         return repo.save(c);
     }
 
-    public void delete(Long id){ repo.deleteById(id); }
+    public void delete(Long id, Long userId){ 
+        getOwned(id, userId);
+        repo.deleteById(id); 
+    }
 }
