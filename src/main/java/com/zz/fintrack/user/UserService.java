@@ -13,8 +13,16 @@ public class UserService {
     public User create(User u){ return repo.save(u); }
     public List<User> list(){ return repo.findAll(); }
     public User get(Long id){ return repo.findById(id).orElseThrow(() -> new EntityNotFoundException("User not found")); }
+
+    public User findByEmail(String email) {
+        return repo.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+    }
     public User update(Long id, User in){
         var u = get(id);
+        if (!u.getEmail().equals(in.getEmail()) && repo.findByEmail(in.getEmail()).isPresent()) {
+            throw new IllegalStateException("Email already in use");
+        }
         u.setName(in.getName());
         u.setEmail(in.getEmail());
         return repo.save(u);

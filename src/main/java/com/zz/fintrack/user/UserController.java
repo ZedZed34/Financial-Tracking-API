@@ -2,9 +2,9 @@ package com.zz.fintrack.user;
 
 import jakarta.validation.Valid;
 import org.springframework.http.*;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/users")
@@ -12,18 +12,25 @@ public class UserController {
     private final UserService service;
     public UserController(UserService s){ this.service = s; }
 
-    @PostMapping
-    public ResponseEntity<User> create(@Valid @RequestBody User u){
-        return ResponseEntity.status(HttpStatus.CREATED).body(service.create(u));
+    /** Get the currently authenticated user's profile. */
+    @GetMapping("/me")
+    public User me(@AuthenticationPrincipal UserDetails principal) {
+        return service.findByEmail(principal.getUsername());
     }
 
-    @GetMapping public List<User> list(){ return service.list(); }
+    /** Update the currently authenticated user's profile. */
+    @PutMapping("/me")
+    public User updateMe(@AuthenticationPrincipal UserDetails principal,
+                         @Valid @RequestBody User u) {
+        User current = service.findByEmail(principal.getUsername());
+        return service.update(current.getId(), u);
+    }
 
-    @GetMapping("{id}") public User get(@PathVariable Long id){ return service.get(id); }
-
-    @PutMapping("{id}") public User update(@PathVariable Long id, @Valid @RequestBody User u){ return service.update(id,u); }
-
-    @DeleteMapping("{id}") public ResponseEntity<Void> delete(@PathVariable Long id){
-        service.delete(id); return ResponseEntity.noContent().build();
+    /** Delete the currently authenticated user's account. */
+    @DeleteMapping("/me")
+    public ResponseEntity<Void> deleteMe(@AuthenticationPrincipal UserDetails principal) {
+        User current = service.findByEmail(principal.getUsername());
+        service.delete(current.getId());
+        return ResponseEntity.noContent().build();
     }
 }

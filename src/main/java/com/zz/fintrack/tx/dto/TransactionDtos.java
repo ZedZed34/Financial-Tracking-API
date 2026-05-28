@@ -1,5 +1,6 @@
 package com.zz.fintrack.tx.dto;
 
+import com.zz.fintrack.tx.TxType;
 import jakarta.validation.constraints.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -7,10 +8,9 @@ import java.time.LocalDate;
 public class TransactionDtos {
 
     public record Create(
-            @NotNull Long userId,
             @NotNull Long accountId,
             Long categoryId,
-            @NotNull String type,
+            @NotNull TxType type,
             @NotNull BigDecimal amount,
             @NotNull LocalDate date,
             String note,

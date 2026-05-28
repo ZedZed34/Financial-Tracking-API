@@ -18,7 +18,11 @@ public class AppUserDetailsService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         User u = users.findByEmail(username).orElseThrow(() -> new UsernameNotFoundException("User not found"));
-        return new org.springframework.security.core.userdetails.User(u.getEmail(), u.getPasswordHash() == null ? "" : u.getPasswordHash(),
+        String hash = u.getPasswordHash();
+        if (hash == null || hash.isBlank()) {
+            throw new UsernameNotFoundException("Account not fully set up");
+        }
+        return new org.springframework.security.core.userdetails.User(u.getEmail(), hash,
                 List.of(new SimpleGrantedAuthority("ROLE_USER")));
     }
 }

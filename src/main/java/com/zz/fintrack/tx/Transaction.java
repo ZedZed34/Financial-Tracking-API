@@ -21,9 +21,11 @@ public class Transaction {
     private Long userId;
 
     @ManyToOne(optional=false, fetch=FetchType.LAZY)
+    @JoinColumn(name = "account_id", nullable = false)
     private Account account;
 
     @ManyToOne(fetch=FetchType.LAZY)
+    @JoinColumn(name = "category_id")
     private Category category;
 
     @Enumerated(EnumType.STRING)

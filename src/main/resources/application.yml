@@ -1,5 +1,7 @@
 # ===== Default profile (PostgreSQL) =====
 spring:
+  application:
+    name: Financial-API
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/fintrack}
     username: ${DB_USERNAME:postgres}
@@ -17,6 +19,16 @@ spring:
     serialization:
       WRITE_DATES_AS_TIMESTAMPS: false
     time-zone: UTC
+  profiles:
+    active: dev
+
+server:
+  port: 3000
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-please-change-me-please-change-me}
+    expiration-ms: ${JWT_EXPIRATION:604800000}
 
 logging:
   level:

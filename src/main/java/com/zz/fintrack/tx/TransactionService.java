@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.temporal.WeekFields;
 import java.util.List;
@@ -30,7 +31,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public View create(Create dto) {
+    public View create(Long userId, Create dto) {
         Account acct = acctRepo.findById(dto.accountId())
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
         Category cat = dto.categoryId() == null ? null :
@@ -38,10 +39,10 @@ public class TransactionService {
                         .orElseThrow(() -> new EntityNotFoundException("Category not found"));
 
         var tx = Transaction.builder()
-                .userId(dto.userId())
+                .userId(userId)
                 .account(acct)
                 .category(cat)
-                .type(TxType.valueOf(dto.type()))
+                .type(dto.type())
                 .amount(dto.amount())
                 .date(dto.date())
                 .note(dto.note())
@@ -49,7 +50,7 @@ public class TransactionService {
                 .fxRateToBase(dto.fxRateToBase())
                 .baseCurrency(dto.baseCurrency())
                 .baseAmount(dto.fxRateToBase() != null
-                        ? dto.amount().multiply(dto.fxRateToBase()).setScale(2)
+                        ? dto.amount().multiply(dto.fxRateToBase()).setScale(2, RoundingMode.HALF_UP)
                         : null)
                 .build();
 
@@ -113,13 +114,15 @@ public class TransactionService {
     public List<com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal> weeklyTotals(Long userId, int weeks) {
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusWeeks(weeks - 1);
-        var data = txRepo.findByUserIdAndDateBetween(userId, start, end, PageRequest.of(0, Integer.MAX_VALUE))
+        // Use a reasonable page size instead of Integer.MAX_VALUE
+        int maxPageSize = 10_000;
+        var data = txRepo.findByUserIdAndDateBetween(userId, start, end, PageRequest.of(0, maxPageSize))
                 .stream()
                 .collect(Collectors.groupingBy(t -> {
                     WeekFields wf = WeekFields.of(Locale.getDefault());
                     int week = t.getDate().get(wf.weekOfWeekBasedYear());
                     int year = t.getDate().get(wf.weekBasedYear());
-                    return year + "-W" + week;
+                    return year + "-W" + String.format("%02d", week);
                 }, Collectors.mapping(t -> t, Collectors.toList())));
 
         return data.entrySet().stream()
@@ -131,7 +134,7 @@ public class TransactionService {
                                 .filter(v -> v != null)
                                 .reduce(BigDecimal.ZERO, BigDecimal::add)
                 ))
-                .sorted((a,b) -> a.week().compareTo(b.week()))
+                .sorted((a, b) -> a.week().compareTo(b.week()))
                 .toList();
     }
 }

@@ -29,4 +29,24 @@ public class ApiExceptionHandler {
     public ResponseEntity<Map<String,String>> handleNotFound(EntityNotFoundException ex){
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", ex.getMessage()));
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<Map<String,String>> handleIllegalArg(IllegalArgumentException ex){
+        return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(org.springframework.dao.DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String,String>> handleDataIntegrity(org.springframework.dao.DataIntegrityViolationException ex){
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Data conflict: a record with the same unique fields already exists"));
+    }
+
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Map<String,String>> handleAccessDenied(org.springframework.security.access.AccessDeniedException ex){
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", ex.getMessage()));
+    }
+
+    @ExceptionHandler(org.springframework.security.authentication.BadCredentialsException.class)
+    public ResponseEntity<Map<String,String>> handleBadCredentials(org.springframework.security.authentication.BadCredentialsException ex){
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid email or password"));
+    }
 }

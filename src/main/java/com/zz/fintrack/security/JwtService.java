@@ -2,6 +2,9 @@ package com.zz.fintrack.security;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -10,6 +13,8 @@ import java.util.Date;
 
 @Service
 public class JwtService {
+    private static final Logger logger = LoggerFactory.getLogger(JwtService.class);
+
     private final Key key;
     private final long expirationMs;
 
@@ -19,6 +24,14 @@ public class JwtService {
     ) {
         this.key = Keys.hmacShaKeyFor(secret.getBytes());
         this.expirationMs = expirationMs;
+    }
+
+    @PostConstruct
+    void validateSecret() {
+        String encoded = new String(key.getEncoded());
+        if (encoded.startsWith("change-me")) {
+            logger.warn("\u26a0\ufe0f  Using default JWT secret! Set app.jwt.secret in production.");
+        }
     }
 
     public String generateToken(String subject) {
