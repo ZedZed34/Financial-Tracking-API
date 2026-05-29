@@ -5,9 +5,9 @@ spring:
   application:
     name: Financial-API
   datasource:
-    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fintrack_db}
-    username: ${DATABASE_USER:postgres}
-    password: ${DATABASE_PASS:postgres}
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USER}
+    password: ${DATABASE_PASS}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false

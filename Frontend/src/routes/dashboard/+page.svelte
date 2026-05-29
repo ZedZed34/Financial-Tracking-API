@@ -2,6 +2,8 @@
     import { onMount } from 'svelte';
     import { goto } from '$app/navigation';
     import { userApi, accountsApi, categoriesApi, transactionsApi } from '$lib/api';
+    import AccountModal from '$lib/components/AccountModal.svelte';
+    import TransactionModal from '$lib/components/TransactionModal.svelte';
 
     let user = $state(null);
     let accounts = $state([]);
@@ -9,6 +11,8 @@
     let transactions = $state([]);
     let loading = $state(true);
     let errorMsg = $state('');
+    let showAccountModal = $state(false);
+    let showTransactionModal = $state(false);
 
     onMount(async () => {
         try {
@@ -95,7 +99,7 @@
             <section class="dashboard-section">
                 <div class="section-header">
                     <h3>Your Accounts</h3>
-                    <button class="btn btn-primary btn-sm">+ Add</button>
+                    <button class="btn btn-primary btn-sm" onclick={() => showAccountModal = true}>+ Add</button>
                 </div>
                 <div class="accounts-list">
                     {#each accounts as account}
@@ -120,7 +124,7 @@
             <section class="dashboard-section main-content">
                 <div class="section-header">
                     <h3>Recent Transactions</h3>
-                    <button class="btn btn-primary btn-sm">+ New Transaction</button>
+                    <button class="btn btn-primary btn-sm" onclick={() => showTransactionModal = true} disabled={accounts.length === 0}>+ New Transaction</button>
                 </div>
                 <div class="glass-card table-container">
                     {#if transactions.length > 0}
@@ -156,6 +160,20 @@
         </main>
     </div>
 {/if}
+
+<AccountModal 
+    show={showAccountModal} 
+    onClose={() => showAccountModal = false} 
+    onSuccess={loadData} 
+/>
+
+<TransactionModal 
+    show={showTransactionModal} 
+    onClose={() => showTransactionModal = false} 
+    onSuccess={loadData}
+    {accounts}
+    {categories}
+/>
 
 <style>
     .dashboard-wrapper {

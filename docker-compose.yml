@@ -1,0 +1,32 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: fintrack-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: Htetlinaung@123
+      POSTGRES_DB: fintrack_db
+    ports:
+      - "5432:5432" # We can use standard 5432 here because it's inside the docker network
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: fintrack-app
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=jdbc:postgresql://db:5432/fintrack_db
+      - DATABASE_USER=postgres
+      - DATABASE_PASS=Htetlinaung@123
+      - JWT_SECRET=super-secret-key-change-me-in-production-please
+    depends_on:
+      - db
+    restart: unless-stopped
+
+volumes:
+  pgdata:
