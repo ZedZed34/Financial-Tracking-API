@@ -9,24 +9,69 @@ services:
       POSTGRES_PASSWORD: Htetlinaung@123
       POSTGRES_DB: fintrack_db
     ports:
-      - "5432:5432" # We can use standard 5432 here because it's inside the docker network
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     restart: unless-stopped
 
+  redis:
+    image: redis:alpine
+    container_name: fintrack-redis
+    ports:
+      - "6380:6379"
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: fintrack-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: fintrack-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
   app:
     build: .
     container_name: fintrack-app
-    ports:
-      - "8080:8080"
+    # Only expose internally to NGINX, not bound to host port
+    expose:
+      - "8080"
     environment:
       - DATABASE_URL=jdbc:postgresql://db:5432/fintrack_db
       - DATABASE_USER=postgres
       - DATABASE_PASS=Htetlinaung@123
       - JWT_SECRET=super-secret-key-change-me-in-production-please
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
     depends_on:
       - db
+      - redis
+      - kafka
     restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: fintrack-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      - "8888:80"
+    depends_on:
+      - app
 
 volumes:
   pgdata:

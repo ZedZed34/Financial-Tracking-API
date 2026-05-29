@@ -3,6 +3,8 @@ package com.zz.fintrack.category;
 import com.zz.fintrack.user.User;
 import com.zz.fintrack.user.UserService;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,14 +18,17 @@ public class CategoryService {
         this.repo = repo; this.users = users;
     }
 
+    @CacheEvict(value = "categories", key = "#userId + '-ALL'")
     public Category create(Long userId, Category in){
         User u = users.get(userId);
         in.setUser(u);
         return repo.save(in);
     }
 
+    @Cacheable(value = "categories", key = "#userId + '-' + (#type != null ? #type : 'ALL')")
     public List<Category> list(Long userId, CategoryType type){
-        return type == null ? repo.findByUserIdAndType(userId, CategoryType.EXPENSE) // default example
+        // Ensure returning all categories if type is not specified (Wait, the original code had a bug! It defaulted to EXPENSE if type was null instead of finding all!)
+        return type == null ? repo.findByUserId(userId) 
                 : repo.findByUserIdAndType(userId, type);
     }
 
@@ -39,6 +44,7 @@ public class CategoryService {
         return c;
     }
 
+    @CacheEvict(value = "categories", allEntries = true)
     public Category update(Long id, Long userId, Category in){
         var c = getOwned(id, userId);
         c.setName(in.getName());
@@ -46,6 +52,7 @@ public class CategoryService {
         return repo.save(c);
     }
 
+    @CacheEvict(value = "categories", allEntries = true)
     public void delete(Long id, Long userId){ 
         getOwned(id, userId);
         repo.deleteById(id); 

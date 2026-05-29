@@ -8,6 +8,8 @@ import com.zz.fintrack.tx.dto.TransactionDtos.Create;
 import com.zz.fintrack.tx.dto.TransactionDtos.View;
 import com.zz.fintrack.tx.dto.TransactionDtos.MonthlyReportRow;
 import jakarta.persistence.EntityNotFoundException;
+import com.zz.fintrack.kafka.AuditProducer;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,12 +27,14 @@ public class TransactionService {
     private final TransactionRepository txRepo;
     private final AccountRepository acctRepo;
     private final CategoryRepository catRepo;
+    private final AuditProducer auditProducer;
 
-    public TransactionService(TransactionRepository txRepo, AccountRepository acctRepo, CategoryRepository catRepo) {
-        this.txRepo = txRepo; this.acctRepo = acctRepo; this.catRepo = catRepo;
+    public TransactionService(TransactionRepository txRepo, AccountRepository acctRepo, CategoryRepository catRepo, AuditProducer auditProducer) {
+        this.txRepo = txRepo; this.acctRepo = acctRepo; this.catRepo = catRepo; this.auditProducer = auditProducer;
     }
 
     @Transactional
+    @CacheEvict(value = "accounts", key = "#userId")
     public View create(Long userId, Create dto) {
         Account acct = acctRepo.findById(dto.accountId())
                 .orElseThrow(() -> new EntityNotFoundException("Account not found"));
@@ -55,6 +59,12 @@ public class TransactionService {
                 .build();
 
         var saved = txRepo.save(tx);
+        
+        // Publish Audit Event to Kafka
+        String message = String.format("User %d created a %s transaction of %s %s", 
+            userId, dto.type(), dto.amount(), dto.currency());
+        auditProducer.publishTransactionEvent(message);
+        
         return toView(saved);
     }
 
