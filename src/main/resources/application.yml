@@ -3,9 +3,9 @@ spring:
   application:
     name: Financial-API
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/fintrack}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:postgres}
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/fintrack_db}
+    username: ${DATABASE_USER:postgres}
+    password: ${DATABASE_PASS:postgres}
     driver-class-name: org.postgresql.Driver
   jpa:
     open-in-view: false
@@ -20,7 +20,7 @@ spring:
       WRITE_DATES_AS_TIMESTAMPS: false
     time-zone: UTC
   profiles:
-    active: dev
+    active: prod
 
 server:
   port: 3000

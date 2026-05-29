@@ -12,10 +12,15 @@
     let email = $state('');
     let password = $state('');
 
-    onMount(() => {
-        // If already logged in, redirect to dashboard
-        if (localStorage.getItem('jwt_token')) {
+    import { userApi } from '$lib/api';
+
+    onMount(async () => {
+        // Check if already logged in via HttpOnly cookie
+        try {
+            await userApi.getMe();
             goto('/dashboard');
+        } catch (e) {
+            // Not logged in, stay on page
         }
     });
 
@@ -26,8 +31,7 @@
         
         try {
             if (isLoginMode) {
-                const response = await authApi.login(email, password);
-                localStorage.setItem('jwt_token', response.token);
+                await authApi.login(email, password);
                 goto('/dashboard');
             } else {
                 await authApi.register(name, email, password);

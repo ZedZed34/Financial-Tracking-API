@@ -11,8 +11,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import jakarta.servlet.http.HttpServletResponse;
 
 import java.util.Map;
 
@@ -32,7 +35,7 @@ public class AuthController {
     }
 
     @PostMapping("/signup")
-    public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest req) {
+    public ResponseEntity<?> signup(@Valid @RequestBody SignupRequest req, HttpServletResponse response) {
         if (users.findByEmail(req.email()).isPresent()) {
             return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Email already registered"));
         }
@@ -43,14 +46,27 @@ public class AuthController {
                 .build();
         users.save(u);
         String token = jwtService.generateToken(u.getEmail());
-        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("token", token));
+        setJwtCookie(response, token);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "Registration successful"));
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletResponse response) {
         Authentication auth = authManager.authenticate(new UsernamePasswordAuthenticationToken(req.email(), req.password()));
         String token = jwtService.generateToken(auth.getName());
-        return ResponseEntity.ok(Map.of("token", token));
+        setJwtCookie(response, token);
+        return ResponseEntity.ok(Map.of("message", "Login successful"));
+    }
+
+    private void setJwtCookie(HttpServletResponse response, String token) {
+        ResponseCookie cookie = ResponseCookie.from("jwt_token", token)
+                .httpOnly(true)
+                .secure(false) // Set to true in production if using HTTPS
+                .path("/")
+                .maxAge(7 * 24 * 60 * 60)
+                .sameSite("Lax")
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
     }
 }
 

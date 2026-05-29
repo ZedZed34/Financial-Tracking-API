@@ -4,18 +4,13 @@ const API_BASE_URL = 'http://localhost:3000/api';
  * Helper function to handle API requests with automatic JWT injection
  */
 export async function fetchApi(endpoint, options = {}) {
-    const token = localStorage.getItem('jwt_token');
-    
     const defaultHeaders = {
         'Content-Type': 'application/json',
     };
 
-    if (token) {
-        defaultHeaders['Authorization'] = `Bearer ${token}`;
-    }
-
     const config = {
         ...options,
+        credentials: 'include', // Automatically send HttpOnly cookies
         headers: {
             ...defaultHeaders,
             ...options.headers
@@ -27,7 +22,6 @@ export async function fetchApi(endpoint, options = {}) {
         
         // Handle 401 Unauthorized (Token expired or invalid)
         if (response.status === 401) {
-            localStorage.removeItem('jwt_token');
             if (window.location.pathname !== '/') {
                 window.location.href = '/';
             }

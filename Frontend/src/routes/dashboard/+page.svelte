@@ -11,11 +11,11 @@
     let errorMsg = $state('');
 
     onMount(async () => {
-        if (!localStorage.getItem('jwt_token')) {
-            goto('/');
-            return;
+        try {
+            await loadData();
+        } catch (e) {
+            // Already handled by API error redirect
         }
-        await loadData();
     });
 
     async function loadData() {
@@ -47,7 +47,11 @@
     }
 
     function logout() {
-        localStorage.removeItem('jwt_token');
+        // To truly logout with HttpOnly cookies, we should call a backend /logout endpoint
+        // that clears the cookie. For now, since we haven't built that, we just redirect.
+        // In a production app, the backend would invalidate the session.
+        // As a quick client-side hack, you can override the cookie:
+        document.cookie = 'jwt_token=; Max-Age=0; path=/';
         goto('/');
     }
 
