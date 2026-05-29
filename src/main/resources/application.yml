@@ -1,5 +1,7 @@
 # ===== Default profile (PostgreSQL) =====
 spring:
+  config:
+    import: optional:file:.env[.properties]
   application:
     name: Financial-API
   datasource:
