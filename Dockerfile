@@ -1,9 +1,9 @@
 # Stage 1: Build the SvelteKit Frontend
 FROM node:22-alpine AS frontend-build
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
+COPY Frontend/package.json ./
 RUN npm install
-COPY frontend/ ./
+COPY Frontend/ ./
 # The svelte.config.js uses adapter-static to output to ../src/main/resources/static
 # This will write the static HTML/JS/CSS to /app/src/main/resources/static
 RUN npm run build
