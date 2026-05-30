@@ -1,25 +1,29 @@
 <script>
     import { transactionsApi } from '$lib/api';
 
-    export let show = false;
-    export let onClose = () => {};
-    export let onSuccess = () => {};
-    export let accounts = [];
-    export let categories = [];
+    let { 
+        show = false, 
+        onClose = () => {}, 
+        onSuccess = () => {}, 
+        accounts = [], 
+        categories = [] 
+    } = $props();
 
-    let amount = 0;
-    let type = 'EXPENSE';
-    let date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    let description = '';
-    let accountId = '';
-    let categoryId = '';
-    let loading = false;
-    let error = '';
+    let amount = $state(0);
+    let type = $state('EXPENSE');
+    let date = $state(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+    let description = $state('');
+    let accountId = $state('');
+    let categoryId = $state('');
+    let loading = $state(false);
+    let error = $state('');
 
     // Auto-select first account if available
-    $: if (show && accounts.length > 0 && !accountId) {
-        accountId = accounts[0].id;
-    }
+    $effect(() => {
+        if (show && accounts.length > 0 && !accountId) {
+            accountId = accounts[0].id;
+        }
+    });
 
     async function handleSubmit() {
         if (!accountId) {

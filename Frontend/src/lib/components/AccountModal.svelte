@@ -1,15 +1,13 @@
 <script>
     import { accountsApi } from '$lib/api';
 
-    export let show = false;
-    export let onClose = () => {};
-    export let onSuccess = () => {};
+    let { show = false, onClose = () => {}, onSuccess = () => {} } = $props();
 
-    let name = '';
-    let type = 'CHECKING';
-    let balance = 0;
-    let loading = false;
-    let error = '';
+    let name = $state('');
+    let type = $state('CHECKING');
+    let balance = $state(0);
+    let loading = $state(false);
+    let error = $state('');
 
     async function handleSubmit() {
         loading = true;
