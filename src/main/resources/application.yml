@@ -57,3 +57,13 @@ spring:
 logging:
   level:
     org.hibernate.SQL: debug
+
+# ===== Prod profile =====
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+server:
+  port: 8080
