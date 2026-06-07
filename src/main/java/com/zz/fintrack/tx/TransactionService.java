@@ -1,13 +1,13 @@
 package com.zz.fintrack.tx;
 
 import com.zz.fintrack.account.Account;
-import com.zz.fintrack.account.AccountRepository;
+import com.zz.fintrack.account.AccountService;
 import com.zz.fintrack.category.Category;
-import com.zz.fintrack.category.CategoryRepository;
+import com.zz.fintrack.category.CategoryService;
 import com.zz.fintrack.tx.dto.TransactionDtos.Create;
-import com.zz.fintrack.tx.dto.TransactionDtos.View;
 import com.zz.fintrack.tx.dto.TransactionDtos.MonthlyReportRow;
-import jakarta.persistence.EntityNotFoundException;
+import com.zz.fintrack.tx.dto.TransactionDtos.View;
+import com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal;
 import com.zz.fintrack.kafka.AuditProducer;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.data.domain.*;
@@ -16,7 +16,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.temporal.WeekFields;
 import java.util.List;
 import java.util.Locale;
@@ -25,22 +27,22 @@ import java.util.stream.Collectors;
 @Service
 public class TransactionService {
     private final TransactionRepository txRepo;
-    private final AccountRepository acctRepo;
-    private final CategoryRepository catRepo;
+    private final AccountService accountService;
+    private final CategoryService categoryService;
     private final AuditProducer auditProducer;
 
-    public TransactionService(TransactionRepository txRepo, AccountRepository acctRepo, CategoryRepository catRepo, AuditProducer auditProducer) {
-        this.txRepo = txRepo; this.acctRepo = acctRepo; this.catRepo = catRepo; this.auditProducer = auditProducer;
+    public TransactionService(TransactionRepository txRepo, AccountService accountService, CategoryService categoryService, AuditProducer auditProducer) {
+        this.txRepo = txRepo;
+        this.accountService = accountService;
+        this.categoryService = categoryService;
+        this.auditProducer = auditProducer;
     }
 
     @Transactional
     @CacheEvict(value = "accounts", key = "#userId")
     public View create(Long userId, Create dto) {
-        Account acct = acctRepo.findById(dto.accountId())
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
-        Category cat = dto.categoryId() == null ? null :
-                catRepo.findById(dto.categoryId())
-                        .orElseThrow(() -> new EntityNotFoundException("Category not found"));
+        Account acct = resolveAccount(dto.accountId(), userId);
+        Category cat = resolveCategory(dto.categoryId(), userId);
 
         var tx = Transaction.builder()
                 .userId(userId)
@@ -73,8 +75,8 @@ public class TransactionService {
     }
 
     public List<MonthlyReportRow> monthlyReport(Long userId, int year, int month) {
-        LocalDate s = LocalDate.of(year, month, 1);
-        LocalDate e = s.withDayOfMonth(s.lengthOfMonth());
+        LocalDate s = YearMonth.of(year, month).atDay(1);
+        LocalDate e = YearMonth.of(year, month).atEndOfMonth();
         return txRepo.totalsByCategory(userId, s, e).stream()
                 .map(p -> new MonthlyReportRow(
                         p.getCategoryId(),
@@ -93,18 +95,25 @@ public class TransactionService {
         );
     }
 
+    private Account resolveAccount(Long accountId, Long userId) {
+        return accountService.getOwned(accountId, userId);
+    }
+
+    private Category resolveCategory(Long categoryId, Long userId) {
+        return categoryId == null ? null
+                : categoryService.getOwned(categoryId, userId);
+    }
+
     @Transactional
     public List<View> seedWeeklyExpenses(Long userId, Long accountId, Long categoryId, int weeks,
                                          String currency, BigDecimal amountPerWeek) {
-        Account acct = acctRepo.findById(accountId)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found"));
-        Category cat = categoryId == null ? null :
-                catRepo.findById(categoryId).orElseThrow(() -> new EntityNotFoundException("Category not found"));
+        Account acct = resolveAccount(accountId, userId);
+        Category cat = resolveCategory(categoryId, userId);
 
         LocalDate today = LocalDate.now();
         LocalDate start = today.minusWeeks(weeks - 1);
         var toSave = start.datesUntil(today.plusDays(1))
-                .filter(d -> d.getDayOfWeek() == java.time.DayOfWeek.SUNDAY) // one expense per week (Sunday)
+                .filter(d -> d.getDayOfWeek() == DayOfWeek.SUNDAY) // one expense per week (Sunday)
                 .map(d -> Transaction.builder()
                         .userId(userId)
                         .account(acct)
@@ -121,30 +130,27 @@ public class TransactionService {
         return txRepo.saveAll(toSave).stream().map(this::toView).toList();
     }
 
-    public List<com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal> weeklyTotals(Long userId, int weeks) {
+    public List<WeeklyTotal> weeklyTotals(Long userId, int weeks) {
         LocalDate end = LocalDate.now();
         LocalDate start = end.minusWeeks(weeks - 1);
-        // Use a reasonable page size instead of Integer.MAX_VALUE
-        int maxPageSize = 10_000;
-        var data = txRepo.findByUserIdAndDateBetween(userId, start, end, PageRequest.of(0, maxPageSize))
+        return txRepo.findByUserIdAndDateBetweenOrderByDateAsc(userId, start, end)
                 .stream()
-                .collect(Collectors.groupingBy(t -> {
-                    WeekFields wf = WeekFields.of(Locale.getDefault());
-                    int week = t.getDate().get(wf.weekOfWeekBasedYear());
-                    int year = t.getDate().get(wf.weekBasedYear());
-                    return year + "-W" + String.format("%02d", week);
-                }, Collectors.mapping(t -> t, Collectors.toList())));
-
-        return data.entrySet().stream()
-                .map(e -> new com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal(
-                        e.getKey(),
-                        e.getValue().stream()
-                                .filter(t -> t.getType() == TxType.EXPENSE)
-                                .map(Transaction::getBaseAmount)
-                                .filter(v -> v != null)
-                                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .collect(Collectors.groupingBy(
+                        t -> toWeekKey(t.getDate()),
+                        Collectors.filtering(
+                                t -> t.getType() == TxType.EXPENSE && t.getBaseAmount() != null,
+                                Collectors.reducing(BigDecimal.ZERO, Transaction::getBaseAmount, BigDecimal::add)
+                        )
                 ))
+                .entrySet().stream()
+                .map(e -> new WeeklyTotal(e.getKey(), e.getValue()))
                 .sorted((a, b) -> a.week().compareTo(b.week()))
                 .toList();
+    }
+
+    private static String toWeekKey(LocalDate date) {
+        WeekFields wf = WeekFields.of(Locale.getDefault());
+        return date.get(wf.weekBasedYear()) + "-W"
+                + String.format("%02d", date.get(wf.weekOfWeekBasedYear()));
     }
 }

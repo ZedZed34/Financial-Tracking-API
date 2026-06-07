@@ -1,9 +1,10 @@
 package com.zz.fintrack.tx;
 
 import com.zz.fintrack.tx.dto.TransactionDtos.Create;
-import com.zz.fintrack.tx.dto.TransactionDtos.View;
 import com.zz.fintrack.tx.dto.TransactionDtos.MonthlyReportRow;
-import com.zz.fintrack.user.UserService;
+import com.zz.fintrack.tx.dto.TransactionDtos.View;
+import com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal;
+import com.zz.fintrack.common.SecurityUtils;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -24,22 +25,18 @@ import java.util.List;
 public class TransactionController {
 
     private final TransactionService service;
-    private final UserService userService;
+    private final SecurityUtils security;
 
-    public TransactionController(TransactionService service, UserService userService) {
+    public TransactionController(TransactionService service, SecurityUtils security) {
         this.service = service;
-        this.userService = userService;
-    }
-
-    private Long currentUserId(UserDetails principal) {
-        return userService.findByEmail(principal.getUsername()).getId();
+        this.security = security;
     }
 
     @PostMapping
     public ResponseEntity<View> create(@AuthenticationPrincipal UserDetails principal,
                                        @Valid @RequestBody Create dto) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(service.create(currentUserId(principal), dto));
+                .body(service.create(security.currentUserId(principal), dto));
     }
 
     @GetMapping
@@ -48,37 +45,22 @@ public class TransactionController {
                              @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate end,
                              @PageableDefault(size = 20, sort = "date", direction = Sort.Direction.DESC)
                              Pageable pageable) {
-        return service.search(currentUserId(principal), start, end, pageable);
+        return service.search(security.currentUserId(principal), start, end, pageable);
     }
 
     @GetMapping("/reports/monthly")
     public List<MonthlyReportRow> monthly(@AuthenticationPrincipal UserDetails principal,
                                           @RequestParam int year,
                                           @RequestParam int month) {
-        return service.monthlyReport(currentUserId(principal), year, month);
-    }
-
-    // DEV ONLY: Create weekly expenses in bulk for the last N weeks (default 26 ~ 6 months)
-    @PostMapping("/seed/weekly")
-    public ResponseEntity<List<View>> seedWeekly(
-            @AuthenticationPrincipal UserDetails principal,
-            @RequestParam Long accountId,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(defaultValue = "26") int weeks,
-            @RequestParam(defaultValue = "USD") String currency,
-            @RequestParam(defaultValue = "25.00") java.math.BigDecimal amountPerWeek
-    ) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(
-                service.seedWeeklyExpenses(currentUserId(principal), accountId, categoryId, weeks, currency, amountPerWeek)
-        );
+        return service.monthlyReport(security.currentUserId(principal), year, month);
     }
 
     // Weekly totals for the last N weeks
     @GetMapping("/reports/weekly-totals")
-    public List<com.zz.fintrack.tx.dto.TransactionDtos.WeeklyTotal> weeklyTotals(
+    public List<WeeklyTotal> weeklyTotals(
             @AuthenticationPrincipal UserDetails principal,
             @RequestParam(defaultValue = "26") int weeks
     ) {
-        return service.weeklyTotals(currentUserId(principal), weeks);
+        return service.weeklyTotals(security.currentUserId(principal), weeks);
     }
 }

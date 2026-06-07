@@ -11,6 +11,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
 
     Page<Transaction> findByUserIdAndDateBetween(Long userId, LocalDate start, LocalDate end, Pageable pageable);
 
+    List<Transaction> findByUserIdAndDateBetweenOrderByDateAsc(Long userId, LocalDate start, LocalDate end);
+
     // Monthly totals by category
     @Query("""
      select t.category.id as categoryId,

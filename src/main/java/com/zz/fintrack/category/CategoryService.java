@@ -5,6 +5,7 @@ import com.zz.fintrack.user.UserService;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -27,7 +28,6 @@ public class CategoryService {
 
     @Cacheable(value = "categories", key = "#userId + '-' + (#type != null ? #type : 'ALL')")
     public List<Category> list(Long userId, CategoryType type){
-        // Ensure returning all categories if type is not specified (Wait, the original code had a bug! It defaulted to EXPENSE if type was null instead of finding all!)
         return type == null ? repo.findByUserId(userId) 
                 : repo.findByUserIdAndType(userId, type);
     }
@@ -39,7 +39,7 @@ public class CategoryService {
     public Category getOwned(Long id, Long userId){
         Category c = get(id);
         if (!c.getUser().getId().equals(userId)) {
-            throw new org.springframework.security.access.AccessDeniedException("You do not own this category");
+            throw new AccessDeniedException("You do not own this category");
         }
         return c;
     }
@@ -53,8 +53,8 @@ public class CategoryService {
     }
 
     @CacheEvict(value = "categories", allEntries = true)
-    public void delete(Long id, Long userId){ 
+    public void delete(Long id, Long userId){
         getOwned(id, userId);
-        repo.deleteById(id); 
+        repo.deleteById(id);
     }
 }
