@@ -1,6 +1,10 @@
+<div align="center">
+  
 # Your daily spend tracker
 
-Check your daily spend with this system.
+**Check your daily spend with this system.**
+
+</div>
 
 ## Build & Test Commands
 
