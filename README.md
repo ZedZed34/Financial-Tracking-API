@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Your daily spend tracker
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Check your daily spend with this system.
 
 ## Build & Test Commands
 
